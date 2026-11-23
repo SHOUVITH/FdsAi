@@ -131,32 +131,134 @@
         document.head.appendChild(t);
       })();
 
-      // Auto-render QR code images inside WebChat widget messages
+      /*
+       * QR Code Auto-Renderer for Sestek Knovvu WebChat
+       * ------------------------------------------------
+       * Problem: The Sestek WebChat widget escapes all HTML for XSS safety.
+       *   - <img src="..."> becomes plain text: &lt;img src="..."&gt;
+       *   - Markdown ![alt](url) becomes plain text: ![alt](url)
+       *   - But bare URLs like https://example.com get auto-linked as <a href="...">
+       *
+       * Solution: The agent outputs the QR code URL as a bare URL on its own line.
+       *   The widget auto-links it to <a href="https://api.qrserver.com/...">
+       *   This script detects those <a> links and replaces them with <img> elements.
+       *   It also catches escaped <img> tags and Markdown images as fallback.
+       */
       (function() {
-        function renderChatImages() {
-          var elements = document.querySelectorAll('div, p, span');
-          elements.forEach(function(el) {
-            if (el.children.length === 0 || (el.children.length === 1 && el.children[0].tagName === 'A')) {
-              var text = el.innerHTML;
-              if (text && !el.dataset.qrFixed && (text.indexOf('api.qrserver.com') !== -1 || text.indexOf('&lt;img') !== -1 || text.indexOf('<img') !== -1 || text.indexOf('![') !== -1)) {
-                var updated = text.replace(/(?:&lt;|<)img\s+src=[\"']([^\"']+)[\"'][^&>]*?(?:&gt;|>)/gi, function(m, src) {
-                  var clean = src.replace(/&amp;/g, '&');
-                  return '<div style="margin:12px auto;text-align:center;"><img src="' + clean + '" alt="QR Code" style="width:160px;height:160px;border-radius:12px;background:#ffffff;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,0.2);display:inline-block;" /></div>';
-                }).replace(/!\[([^\]]*)\]\((https?:\/\/[^\s\)]+)\)/gi, function(m, alt, src) {
-                  var clean = src.replace(/&amp;/g, '&');
-                  return '<div style="margin:12px auto;text-align:center;"><img src="' + clean + '" alt="' + (alt || 'QR Code') + '" style="width:160px;height:160px;border-radius:12px;background:#ffffff;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,0.2);display:inline-block;" /></div>';
-                });
-                if (updated !== text) {
-                  el.innerHTML = updated;
-                  el.dataset.qrFixed = 'true';
-                }
-              }
+        var QR_HOST = 'api.qrserver.com';
+
+        function processElement(el) {
+          if (el.dataset && el.dataset.qrRendered) return;
+
+          var html = el.innerHTML;
+          if (!html || html.indexOf(QR_HOST) === -1) return;
+
+          var changed = false;
+          var newHtml = html;
+
+          // Pattern 1: Widget auto-linked the URL -> <a href="https://api.qrserver.com/...">...</a>
+          newHtml = newHtml.replace(
+            /<a\s+[^>]*href=["'](https?:\/\/api\.qrserver\.com\/[^"']+)["'][^>]*>[^<]*<\/a>/gi,
+            function(match, src) {
+              changed = true;
+              var cleanSrc = src.replace(/&amp;/g, '&');
+              return '<div style="margin:10px 0;text-align:center;">' +
+                '<img src="' + cleanSrc + '" alt="Scan QR Code" ' +
+                'style="width:160px;height:160px;border-radius:10px;background:#fff;padding:6px;' +
+                'box-shadow:0 3px 12px rgba(0,0,0,0.15);display:inline-block;" />' +
+                '</div>';
+            }
+          );
+
+          // Pattern 2: Escaped HTML img tag -> &lt;img src="..."&gt;
+          newHtml = newHtml.replace(
+            /&lt;img\s+src=(?:&quot;|"|'|&#34;)(https?:\/\/api\.qrserver\.com\/[^"'&]+(?:&amp;[^"'&]+)*)(?:&quot;|"|'|&#34;)[^&]*?(?:&gt;|>)/gi,
+            function(match, src) {
+              changed = true;
+              var cleanSrc = src.replace(/&amp;/g, '&');
+              return '<div style="margin:10px 0;text-align:center;">' +
+                '<img src="' + cleanSrc + '" alt="Scan QR Code" ' +
+                'style="width:160px;height:160px;border-radius:10px;background:#fff;padding:6px;' +
+                'box-shadow:0 3px 12px rgba(0,0,0,0.15);display:inline-block;" />' +
+                '</div>';
+            }
+          );
+
+          // Pattern 3: Markdown image -> ![alt](https://api.qrserver.com/...)
+          newHtml = newHtml.replace(
+            /!\[([^\]]*)\]\((https?:\/\/api\.qrserver\.com\/[^\s\)]+)\)/gi,
+            function(match, alt, src) {
+              changed = true;
+              var cleanSrc = src.replace(/&amp;/g, '&');
+              return '<div style="margin:10px 0;text-align:center;">' +
+                '<img src="' + cleanSrc + '" alt="' + (alt || 'Scan QR Code') + '" ' +
+                'style="width:160px;height:160px;border-radius:10px;background:#fff;padding:6px;' +
+                'box-shadow:0 3px 12px rgba(0,0,0,0.15);display:inline-block;" />' +
+                '</div>';
+            }
+          );
+
+          // Pattern 4: Plain text URL not yet linked (bare URL on its own)
+          newHtml = newHtml.replace(
+            /(?:^|>|\n)(https?:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?[^\s<]+)(?:<|\n|$)/gi,
+            function(match, src) {
+              if (match.indexOf('<img') !== -1) return match; // already converted
+              changed = true;
+              var cleanSrc = src.replace(/&amp;/g, '&');
+              var prefix = match.charAt(0) === 'h' ? '' : match.charAt(0);
+              var suffix = match.charAt(match.length - 1) === src.charAt(src.length - 1) ? '' : match.charAt(match.length - 1);
+              return prefix + '<div style="margin:10px 0;text-align:center;">' +
+                '<img src="' + cleanSrc + '" alt="Scan QR Code" ' +
+                'style="width:160px;height:160px;border-radius:10px;background:#fff;padding:6px;' +
+                'box-shadow:0 3px 12px rgba(0,0,0,0.15);display:inline-block;" />' +
+                '</div>' + suffix;
+            }
+          );
+
+          if (changed) {
+            el.innerHTML = newHtml;
+            el.dataset.qrRendered = 'true';
+          }
+        }
+
+        function scanAll() {
+          // Scan all elements inside the webchat widget area
+          var allEls = document.querySelectorAll(
+            '[class*="chat"] *, [class*="Chat"] *, [class*="webchat"] *, [class*="message"] *, [class*="Message"] *, [id*="chat"] *, [id*="webchat"] *'
+          );
+          allEls.forEach(processElement);
+
+          // Also scan any element anywhere that contains the QR host
+          document.querySelectorAll('div, p, span, li, td').forEach(function(el) {
+            if (el.innerHTML && el.innerHTML.indexOf(QR_HOST) !== -1) {
+              processElement(el);
             }
           });
         }
-        var observer = new MutationObserver(renderChatImages);
-        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-        setInterval(renderChatImages, 600);
+
+        // Watch for new messages added to the DOM
+        var observer = new MutationObserver(function(mutations) {
+          var dominated = false;
+          for (var i = 0; i < mutations.length; i++) {
+            if (mutations[i].addedNodes.length > 0) { dominated = true; break; }
+          }
+          if (dominated) {
+            setTimeout(scanAll, 100);
+            setTimeout(scanAll, 400);
+          }
+        });
+
+        // Start observing once body is ready
+        if (document.body) {
+          observer.observe(document.body, { childList: true, subtree: true });
+        } else {
+          document.addEventListener('DOMContentLoaded', function() {
+            observer.observe(document.body, { childList: true, subtree: true });
+          });
+        }
+
+        // Periodic fallback scan every 800ms
+        setInterval(scanAll, 800);
       })();
     </script>
 </body>
