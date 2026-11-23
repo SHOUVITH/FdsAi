@@ -89,66 +89,151 @@
         document.head.appendChild(t);
       })();
 
-      // QR Code Auto-Renderer
-      // The Sestek WebChat widget auto-converts bare URLs into <a href="..."> links.
-      // This script watches the DOM and whenever it finds an <a> pointing to
-      // api.qrserver.com it replaces it with a rendered <img> so users see the QR.
+      // Ultra-Forensic Universal QR Code Auto-Renderer (Pierces Shadow DOM + iframes + Host DOM)
       (function () {
-        var QR = 'api.qrserver.com';
-        var STYLE = 'width:170px;height:170px;border-radius:10px;background:#fff;padding:6px;display:block;margin:10px auto;box-shadow:0 3px 14px rgba(0,0,0,.2);';
+        var QR_KEY = 'api.qrserver.com';
+        var STYLE = 'width:170px;height:170px;border-radius:10px;background:#fff;padding:6px;display:block;margin:6px auto;box-shadow:0 3px 14px rgba(0,0,0,.2);';
 
-        function fix() {
-          // ── Primary path: auto-linked <a href="https://api.qrserver.com/..."> ──
-          document.querySelectorAll('a[href*="' + QR + '"]').forEach(function (a) {
-            if (a.dataset.qrDone) return;
+        function getAllRoots(startRoot) {
+          var roots = [startRoot || document];
+          function walk(node) {
+            if (!node || !node.querySelectorAll) return;
+            var els = node.querySelectorAll('*');
+            for (var i = 0; i < els.length; i++) {
+              var el = els[i];
+              if (el.shadowRoot && roots.indexOf(el.shadowRoot) === -1) {
+                roots.push(el.shadowRoot);
+                walk(el.shadowRoot);
+              }
+              if (el.tagName === 'IFRAME') {
+                try {
+                  var doc = el.contentDocument || (el.contentWindow && el.contentWindow.document);
+                  if (doc && roots.indexOf(doc) === -1) {
+                    roots.push(doc);
+                    walk(doc);
+                  }
+                } catch (e) {
+                  // cross-origin restriction catch
+                }
+              }
+            }
+          }
+          try { walk(startRoot || document); } catch (e) {}
+          return roots;
+        }
+
+        function fixInRoot(root) {
+          if (!root || !root.querySelectorAll) return;
+
+          // 1. Process <a> tags pointing to api.qrserver.com or create-qr-code
+          var links = [];
+          try {
+            links = root.querySelectorAll('a[href*="' + QR_KEY + '"], a[href*="create-qr-code"]');
+          } catch (e) {}
+
+          for (var i = 0; i < links.length; i++) {
+            var a = links[i];
+            if (a.dataset.qrDone) continue;
             a.dataset.qrDone = '1';
-            var src = a.href; // browser already unescaped &amp; → &
+
+            var src = a.href;
             var wrap = document.createElement('div');
-            wrap.style.textAlign = 'center';
-            wrap.style.margin = '8px 0';
+            wrap.className = 'fds-qr-container';
+            wrap.style.cssText = 'text-align:center;margin:10px 0;padding:10px;background:rgba(255,255,255,0.06);border-radius:12px;border:1px solid rgba(255,255,255,0.12);';
+
+            var aImg = document.createElement('a');
+            aImg.href = 'https://passwordreset.microsoftonline.com';
+            aImg.target = '_blank';
+            aImg.rel = 'noopener noreferrer';
+            aImg.title = 'Click to open Microsoft SSPR portal directly';
+
             var img = document.createElement('img');
             img.src = src;
-            img.alt = 'Scan QR Code';
+            img.alt = 'Scan QR Code to Unlock Account';
             img.style.cssText = STYLE;
-            img.onerror = function () {
-              // If image fails (e.g. CSP), put the link back
-              if (wrap.parentNode) wrap.parentNode.replaceChild(a, wrap);
-            };
-            wrap.appendChild(img);
-            if (a.parentNode) a.parentNode.replaceChild(wrap, a);
-          });
+            aImg.appendChild(img);
 
-          // ── Fallback A: escaped &lt;img src="https://api.qrserver.com/..."&gt; ──
-          // ── Fallback B: Markdown  ![alt](https://api.qrserver.com/...)      ──
-          document.querySelectorAll('div,p,span,li').forEach(function (el) {
+            var caption = document.createElement('div');
+            caption.style.cssText = 'font-size:12px;color:#a0aec0;margin-top:6px;';
+            caption.innerHTML = '<span style="color:#63b3ed;font-weight:600;">📱 Scan with mobile</span> or <a href="https://passwordreset.microsoftonline.com" target="_blank" style="color:#63b3ed;text-decoration:underline;">Click to open portal</a>';
+
+            wrap.appendChild(aImg);
+            wrap.appendChild(caption);
+
+            if (a.parentNode) {
+              a.parentNode.replaceChild(wrap, a);
+            }
+          }
+
+          // 2. Fallback: text nodes or innerHTML containing escaped <img> or markdown
+          var candidates = [];
+          try {
+            candidates = root.querySelectorAll('div,p,span,li');
+          } catch (e) {}
+
+          for (var j = 0; j < candidates.length; j++) {
+            var el = candidates[j];
             var h = el.innerHTML;
-            if (!h || !h.includes(QR)) return;
-            if (el.dataset.qrFixed) return;
+            if (!h || h.indexOf(QR_KEY) === -1 || el.dataset.qrFixed || el.querySelector('.fds-qr-container')) continue;
+
             var n = h
-              // escaped <img> tag
-              .replace(/&lt;img\s+src=(?:&quot;|")(https?:\/\/api\.qrserver\.com\/[^"&]+(?:&amp;[^"&]+)*)(?:&quot;|")[^&]*?(?:&gt;|>)/gi,
-                function (m, s) { return qrDiv(s.replace(/&amp;/g, '&')); })
-              // Markdown image
-              .replace(/!\[([^\]]*)\]\((https?:\/\/api\.qrserver\.com\/[^\s)]+)\)/gi,
-                function (m, a, s) { return qrDiv(s.replace(/&amp;/g, '&')); });
-            if (n !== h) { el.innerHTML = n; el.dataset.qrFixed = '1'; }
+              .replace(/&lt;img\s+src=(?:&quot;|")(https?:\/\/api\.qrserver\.com\/[^"&]+(?:&amp;[^"&]+)*)(?:&quot;|")[^&]*?(?:&gt;|>)/gi, function (m, s) {
+                return qrMarkup(s.replace(/&amp;/g, '&'));
+              })
+              .replace(/!\[([^\]]*)\]\((https?:\/\/api\.qrserver\.com\/[^\s)]+)\)/gi, function (m, a, s) {
+                return qrMarkup(s.replace(/&amp;/g, '&'));
+              });
+
+            if (n !== h) {
+              el.innerHTML = n;
+              el.dataset.qrFixed = '1';
+            }
+          }
+        }
+
+        function qrMarkup(src) {
+          return '<div class="fds-qr-container" style="text-align:center;margin:10px 0;padding:10px;background:rgba(255,255,255,0.06);border-radius:12px;border:1px solid rgba(255,255,255,0.12);">' +
+            '<a href="https://passwordreset.microsoftonline.com" target="_blank" title="Click to open Microsoft SSPR portal">' +
+            '<img src="' + src + '" alt="Scan QR Code" style="' + STYLE + '" /></a>' +
+            '<div style="font-size:12px;color:#a0aec0;margin-top:6px;"><span style="color:#63b3ed;font-weight:600;">📱 Scan with mobile</span> or <a href="https://passwordreset.microsoftonline.com" target="_blank" style="color:#63b3ed;text-decoration:underline;">Click to open portal</a></div>' +
+            '</div>';
+        }
+
+        function runScan() {
+          var roots = getAllRoots(document);
+          for (var r = 0; r < roots.length; r++) {
+            fixInRoot(roots[r]);
+            observeRoot(roots[r]);
+          }
+        }
+
+        var observedRoots = typeof WeakSet !== 'undefined' ? new WeakSet() : null;
+        function observeRoot(root) {
+          if (!root) return;
+          if (observedRoots) {
+            if (observedRoots.has(root)) return;
+            observedRoots.add(root);
+          }
+          try {
+            var mo = new MutationObserver(function () {
+              setTimeout(runScan, 50);
+              setTimeout(runScan, 300);
+            });
+            var target = root.body || root;
+            mo.observe(target, { childList: true, subtree: true });
+          } catch (e) {}
+        }
+
+        if (document.body) {
+          runScan();
+          observeRoot(document.body);
+        } else {
+          document.addEventListener('DOMContentLoaded', function () {
+            runScan();
+            observeRoot(document.body);
           });
         }
-
-        function qrDiv(src) {
-          return '<div style="text-align:center;margin:8px 0;"><img src="' + src +
-            '" alt="Scan QR Code" style="' + STYLE + '" /></div>';
-        }
-
-        // Run on every DOM change (new chat bubble arriving) + poll every 800 ms
-        var mo = new MutationObserver(function () {
-          setTimeout(fix, 60);
-          setTimeout(fix, 350);
-          setTimeout(fix, 900);
-        });
-        function start() { mo.observe(document.body, { childList: true, subtree: true }); }
-        document.body ? start() : document.addEventListener('DOMContentLoaded', start);
-        setInterval(fix, 800);
+        setInterval(runScan, 600);
       })();
     </script>
 </body>
