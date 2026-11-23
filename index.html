@@ -130,6 +130,34 @@
         t.setAttribute('data-integrationSettingsUrl', 'https://eu.va.knovvu.com/webchat/');
         document.head.appendChild(t);
       })();
+
+      // Auto-render QR code images inside WebChat widget messages
+      (function() {
+        function renderChatImages() {
+          var elements = document.querySelectorAll('div, p, span');
+          elements.forEach(function(el) {
+            if (el.children.length === 0 || (el.children.length === 1 && el.children[0].tagName === 'A')) {
+              var text = el.innerHTML;
+              if (text && !el.dataset.qrFixed && (text.indexOf('api.qrserver.com') !== -1 || text.indexOf('&lt;img') !== -1 || text.indexOf('<img') !== -1 || text.indexOf('![') !== -1)) {
+                var updated = text.replace(/(?:&lt;|<)img\s+src=[\"']([^\"']+)[\"'][^&>]*?(?:&gt;|>)/gi, function(m, src) {
+                  var clean = src.replace(/&amp;/g, '&');
+                  return '<div style="margin:12px auto;text-align:center;"><img src="' + clean + '" alt="QR Code" style="width:160px;height:160px;border-radius:12px;background:#ffffff;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,0.2);display:inline-block;" /></div>';
+                }).replace(/!\[([^\]]*)\]\((https?:\/\/[^\s\)]+)\)/gi, function(m, alt, src) {
+                  var clean = src.replace(/&amp;/g, '&');
+                  return '<div style="margin:12px auto;text-align:center;"><img src="' + clean + '" alt="' + (alt || 'QR Code') + '" style="width:160px;height:160px;border-radius:12px;background:#ffffff;padding:8px;box-shadow:0 4px 14px rgba(0,0,0,0.2);display:inline-block;" /></div>';
+                });
+                if (updated !== text) {
+                  el.innerHTML = updated;
+                  el.dataset.qrFixed = 'true';
+                }
+              }
+            }
+          });
+        }
+        var observer = new MutationObserver(renderChatImages);
+        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+        setInterval(renderChatImages, 600);
+      })();
     </script>
 </body>
 
