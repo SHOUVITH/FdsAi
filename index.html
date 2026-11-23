@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,12 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #0b0f19 0%, #111827 55%, #1a1f36 100%);
@@ -27,88 +21,51 @@
             overflow-x: hidden;
             position: relative;
         }
-
         .glow {
             position: fixed;
-            width: 520px;
-            height: 520px;
+            width: 520px; height: 520px;
             border-radius: 50%;
             filter: blur(130px);
             opacity: 0.22;
             pointer-events: none;
         }
-
-        .glow-1 {
-            background: #6366f1;
-            top: -140px;
-            left: -120px;
-        }
-
-        .glow-2 {
-            background: #a20707;
-            bottom: -140px;
-            right: -120px;
-        }
-
+        .glow-1 { background: #6366f1; top: -140px; left: -120px; }
+        .glow-2 { background: #a20707; bottom: -140px; right: -120px; }
         .container {
             background: rgba(17, 24, 39, 0.72);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255,255,255,0.1);
             border-radius: 24px;
             padding: 52px 44px;
             max-width: 600px;
             width: 100%;
             text-align: center;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+            box-shadow: 0 25px 60px rgba(0,0,0,0.45);
             position: relative;
             z-index: 1;
         }
-
         .eyebrow {
-            font-size: 13px;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: #94a3b8;
-            margin-bottom: 14px;
+            font-size: 13px; font-weight: 600;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            color: #94a3b8; margin-bottom: 14px;
         }
-
         h1 {
             font-size: clamp(2rem, 4vw, 2.6rem);
-            font-weight: 800;
-            margin-bottom: 18px;
+            font-weight: 800; margin-bottom: 18px;
             background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             letter-spacing: -0.02em;
         }
-
-        p.description {
-            color: #cbd5e1;
-            font-size: 16px;
-            line-height: 1.7;
-            margin-bottom: 16px;
-        }
-
-        p.sub-description {
-            color: #94a3b8;
-            font-size: 14.5px;
-            line-height: 1.65;
-        }
-
-        @media (max-width: 540px) {
-            .container {
-                padding: 36px 24px;
-            }
-        }
+        p.description { color: #cbd5e1; font-size: 16px; line-height: 1.7; margin-bottom: 16px; }
+        p.sub-description { color: #94a3b8; font-size: 14.5px; line-height: 1.65; }
+        @media (max-width: 540px) { .container { padding: 36px 24px; } }
     </style>
 </head>
-
 <body>
     <div class="glow glow-1"></div>
     <div class="glow glow-2"></div>
-
     <main class="container">
         <div class="eyebrow">Fourth Dimension Systems</div>
         <h1>FDS Agentic AI</h1>
@@ -121,9 +78,10 @@
     </main>
 
     <script>
+      // Load Sestek Knovvu WebChat Widget
       !(function () {
         var t = document.createElement('script');
-        t.setAttribute('id','webChatPlugin');
+        t.setAttribute('id', 'webChatPlugin');
         t.setAttribute('src', 'https://eu.va.knovvu.com/webchat-plugin/chat.min.js');
         t.setAttribute('async', '');
         t.setAttribute('data-integrationId', '30523891-a3f9-6956-fecf-3a2088835999');
@@ -131,136 +89,67 @@
         document.head.appendChild(t);
       })();
 
-      /*
-       * QR Code Auto-Renderer for Sestek Knovvu WebChat
-       * ------------------------------------------------
-       * Problem: The Sestek WebChat widget escapes all HTML for XSS safety.
-       *   - <img src="..."> becomes plain text: &lt;img src="..."&gt;
-       *   - Markdown ![alt](url) becomes plain text: ![alt](url)
-       *   - But bare URLs like https://example.com get auto-linked as <a href="...">
-       *
-       * Solution: The agent outputs the QR code URL as a bare URL on its own line.
-       *   The widget auto-links it to <a href="https://api.qrserver.com/...">
-       *   This script detects those <a> links and replaces them with <img> elements.
-       *   It also catches escaped <img> tags and Markdown images as fallback.
-       */
-      (function() {
-        var QR_HOST = 'api.qrserver.com';
+      // QR Code Auto-Renderer
+      // The Sestek WebChat widget auto-converts bare URLs into <a href="..."> links.
+      // This script watches the DOM and whenever it finds an <a> pointing to
+      // api.qrserver.com it replaces it with a rendered <img> so users see the QR.
+      (function () {
+        var QR = 'api.qrserver.com';
+        var STYLE = 'width:170px;height:170px;border-radius:10px;background:#fff;padding:6px;display:block;margin:10px auto;box-shadow:0 3px 14px rgba(0,0,0,.2);';
 
-        function processElement(el) {
-          if (el.dataset && el.dataset.qrRendered) return;
+        function fix() {
+          // ── Primary path: auto-linked <a href="https://api.qrserver.com/..."> ──
+          document.querySelectorAll('a[href*="' + QR + '"]').forEach(function (a) {
+            if (a.dataset.qrDone) return;
+            a.dataset.qrDone = '1';
+            var src = a.href; // browser already unescaped &amp; → &
+            var wrap = document.createElement('div');
+            wrap.style.textAlign = 'center';
+            wrap.style.margin = '8px 0';
+            var img = document.createElement('img');
+            img.src = src;
+            img.alt = 'Scan QR Code';
+            img.style.cssText = STYLE;
+            img.onerror = function () {
+              // If image fails (e.g. CSP), put the link back
+              if (wrap.parentNode) wrap.parentNode.replaceChild(a, wrap);
+            };
+            wrap.appendChild(img);
+            if (a.parentNode) a.parentNode.replaceChild(wrap, a);
+          });
 
-          var html = el.innerHTML;
-          if (!html || html.indexOf(QR_HOST) === -1) return;
-
-          var changed = false;
-          var newHtml = html;
-
-          // Pattern 1: Widget auto-linked the URL -> <a href="https://api.qrserver.com/...">...</a>
-          newHtml = newHtml.replace(
-            /<a\s+[^>]*href=["'](https?:\/\/api\.qrserver\.com\/[^"']+)["'][^>]*>[^<]*<\/a>/gi,
-            function(match, src) {
-              changed = true;
-              var cleanSrc = src.replace(/&amp;/g, '&');
-              return '<div style="margin:10px 0;text-align:center;">' +
-                '<img src="' + cleanSrc + '" alt="Scan QR Code" ' +
-                'style="width:160px;height:160px;border-radius:10px;background:#fff;padding:6px;' +
-                'box-shadow:0 3px 12px rgba(0,0,0,0.15);display:inline-block;" />' +
-                '</div>';
-            }
-          );
-
-          // Pattern 2: Escaped HTML img tag -> &lt;img src="..."&gt;
-          newHtml = newHtml.replace(
-            /&lt;img\s+src=(?:&quot;|"|'|&#34;)(https?:\/\/api\.qrserver\.com\/[^"'&]+(?:&amp;[^"'&]+)*)(?:&quot;|"|'|&#34;)[^&]*?(?:&gt;|>)/gi,
-            function(match, src) {
-              changed = true;
-              var cleanSrc = src.replace(/&amp;/g, '&');
-              return '<div style="margin:10px 0;text-align:center;">' +
-                '<img src="' + cleanSrc + '" alt="Scan QR Code" ' +
-                'style="width:160px;height:160px;border-radius:10px;background:#fff;padding:6px;' +
-                'box-shadow:0 3px 12px rgba(0,0,0,0.15);display:inline-block;" />' +
-                '</div>';
-            }
-          );
-
-          // Pattern 3: Markdown image -> ![alt](https://api.qrserver.com/...)
-          newHtml = newHtml.replace(
-            /!\[([^\]]*)\]\((https?:\/\/api\.qrserver\.com\/[^\s\)]+)\)/gi,
-            function(match, alt, src) {
-              changed = true;
-              var cleanSrc = src.replace(/&amp;/g, '&');
-              return '<div style="margin:10px 0;text-align:center;">' +
-                '<img src="' + cleanSrc + '" alt="' + (alt || 'Scan QR Code') + '" ' +
-                'style="width:160px;height:160px;border-radius:10px;background:#fff;padding:6px;' +
-                'box-shadow:0 3px 12px rgba(0,0,0,0.15);display:inline-block;" />' +
-                '</div>';
-            }
-          );
-
-          // Pattern 4: Plain text URL not yet linked (bare URL on its own)
-          newHtml = newHtml.replace(
-            /(?:^|>|\n)(https?:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?[^\s<]+)(?:<|\n|$)/gi,
-            function(match, src) {
-              if (match.indexOf('<img') !== -1) return match; // already converted
-              changed = true;
-              var cleanSrc = src.replace(/&amp;/g, '&');
-              var prefix = match.charAt(0) === 'h' ? '' : match.charAt(0);
-              var suffix = match.charAt(match.length - 1) === src.charAt(src.length - 1) ? '' : match.charAt(match.length - 1);
-              return prefix + '<div style="margin:10px 0;text-align:center;">' +
-                '<img src="' + cleanSrc + '" alt="Scan QR Code" ' +
-                'style="width:160px;height:160px;border-radius:10px;background:#fff;padding:6px;' +
-                'box-shadow:0 3px 12px rgba(0,0,0,0.15);display:inline-block;" />' +
-                '</div>' + suffix;
-            }
-          );
-
-          if (changed) {
-            el.innerHTML = newHtml;
-            el.dataset.qrRendered = 'true';
-          }
-        }
-
-        function scanAll() {
-          // Scan all elements inside the webchat widget area
-          var allEls = document.querySelectorAll(
-            '[class*="chat"] *, [class*="Chat"] *, [class*="webchat"] *, [class*="message"] *, [class*="Message"] *, [id*="chat"] *, [id*="webchat"] *'
-          );
-          allEls.forEach(processElement);
-
-          // Also scan any element anywhere that contains the QR host
-          document.querySelectorAll('div, p, span, li, td').forEach(function(el) {
-            if (el.innerHTML && el.innerHTML.indexOf(QR_HOST) !== -1) {
-              processElement(el);
-            }
+          // ── Fallback A: escaped &lt;img src="https://api.qrserver.com/..."&gt; ──
+          // ── Fallback B: Markdown  ![alt](https://api.qrserver.com/...)      ──
+          document.querySelectorAll('div,p,span,li').forEach(function (el) {
+            var h = el.innerHTML;
+            if (!h || !h.includes(QR)) return;
+            if (el.dataset.qrFixed) return;
+            var n = h
+              // escaped <img> tag
+              .replace(/&lt;img\s+src=(?:&quot;|")(https?:\/\/api\.qrserver\.com\/[^"&]+(?:&amp;[^"&]+)*)(?:&quot;|")[^&]*?(?:&gt;|>)/gi,
+                function (m, s) { return qrDiv(s.replace(/&amp;/g, '&')); })
+              // Markdown image
+              .replace(/!\[([^\]]*)\]\((https?:\/\/api\.qrserver\.com\/[^\s)]+)\)/gi,
+                function (m, a, s) { return qrDiv(s.replace(/&amp;/g, '&')); });
+            if (n !== h) { el.innerHTML = n; el.dataset.qrFixed = '1'; }
           });
         }
 
-        // Watch for new messages added to the DOM
-        var observer = new MutationObserver(function(mutations) {
-          var dominated = false;
-          for (var i = 0; i < mutations.length; i++) {
-            if (mutations[i].addedNodes.length > 0) { dominated = true; break; }
-          }
-          if (dominated) {
-            setTimeout(scanAll, 100);
-            setTimeout(scanAll, 400);
-          }
+        function qrDiv(src) {
+          return '<div style="text-align:center;margin:8px 0;"><img src="' + src +
+            '" alt="Scan QR Code" style="' + STYLE + '" /></div>';
+        }
+
+        // Run on every DOM change (new chat bubble arriving) + poll every 800 ms
+        var mo = new MutationObserver(function () {
+          setTimeout(fix, 60);
+          setTimeout(fix, 350);
+          setTimeout(fix, 900);
         });
-
-        // Start observing once body is ready
-        if (document.body) {
-          observer.observe(document.body, { childList: true, subtree: true });
-        } else {
-          document.addEventListener('DOMContentLoaded', function() {
-            observer.observe(document.body, { childList: true, subtree: true });
-          });
-        }
-
-        // Periodic fallback scan every 800ms
-        setInterval(scanAll, 800);
+        function start() { mo.observe(document.body, { childList: true, subtree: true }); }
+        document.body ? start() : document.addEventListener('DOMContentLoaded', start);
+        setInterval(fix, 800);
       })();
     </script>
 </body>
-
 </html>
